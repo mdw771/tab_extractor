@@ -2,13 +2,14 @@ import logging
 
 import numpy as np
 from PIL import Image
-import cv2
 
 from tab_extractor.loader import Loader
+from tab_extractor.configs import *
 
 
 class Processor:
-    def __init__(self, loader: Loader, page_aspect_ratio=(11, 8.5)):
+
+    def __init__(self, loader: Loader, page_aspect_ratio: tuple = (11, 8.5), extraction_configs: Config = None):
         """
         The constructor.
 
@@ -18,16 +19,25 @@ class Processor:
         """
         self.loader = loader
         self.unique_images = []
-        self.diff_threshold = 10
+        self.extraction_configs = extraction_configs
         self.pages = []
         self.page_aspect_ratio = page_aspect_ratio
 
     def build_unique_images(self):
+        if self.extraction_configs is None:
+            self.extraction_configs = ExtractionConfig()
+        if self.extraction_configs.method == 'diff_thresholding':
+            if not isinstance(self.extraction_configs, DiffThresholdingExtractionConfig):
+                self.extraction_configs = DiffThresholdingExtractionConfig()
+            self.build_unique_images_diff_thresholding()
+
+    def build_unique_images_diff_thresholding(self):
+        assert isinstance(self.extraction_configs, DiffThresholdingExtractionConfig)
         self.unique_images = [self.loader.images[0]]
         for i, img in enumerate(self.loader.images[1:]):
             diff = np.mean((img - self.unique_images[-1]) ** 2)
             logging.debug('MSE between current frame and last unique frame is {}.'.format(diff))
-            if diff > self.diff_threshold:
+            if diff > self.extraction_configs.diff_threshold:
                 self.unique_images.append(img)
 
     def find_num_lines_per_page(self):
